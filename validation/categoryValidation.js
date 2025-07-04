@@ -2,7 +2,7 @@ const Joi = require("joi");
 
 function createCategoryValidation(category) {
   const schema = Joi.object({
-    name: Joi.string().min(2).max(100).required(),
+    name: Joi.string().min(2).max(100).uppercase().required(),
   });
   return schema.validate(category);
 }
