@@ -8,4 +8,11 @@ function addToCartValidation(data) {
   return schema.validate(data);
 }
 
-module.exports = { addToCartValidation };
+const updateCartValidation = (data) => {
+  const schema = Joi.object({
+    quantity: Joi.number().integer().min(0).required(),
+  });
+  return schema.validate(data);
+};
+
+module.exports = { addToCartValidation, updateCartValidation };

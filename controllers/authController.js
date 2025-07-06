@@ -15,7 +15,7 @@ const registerUser = asyncHandler(async (req, res) => {
   }
   const existingUser = await User.findOne({ email: email });
   if (existingUser) {
-    return res.status(401).json({ message: "this user is already exists" });
+    return res.status(400).json({ message: "this user is already exists" });
   }
   const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -25,15 +25,8 @@ const registerUser = asyncHandler(async (req, res) => {
     password: hashedPassword,
   });
 
-  const token = JWT.sign(
-    { userId: newUser._id, isAdmin: newUser.isAdmin },
-    process.env.JWT_SECRET,
-    { expiresIn: "1d" }
-  );
-
-  res.status(200).json({
+  res.status(201).json({
     message: "register successful",
-    token,
     user: {
       id: newUser._id,
       name: newUser.userName,
@@ -55,12 +48,12 @@ const loginUser = asyncHandler(async (req, res) => {
     return res.status(404).json({ message: "email does not exists " });
   }
   const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
+  if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
   const token = JWT.sign(
     { userId: user._id, isAdmin: user.isAdmin },
     process.env.JWT_SECRET,
-    { expiresIn: "1d" }
+    { expiresIn: "7d" }
   );
 
   res.status(200).json({

@@ -18,6 +18,8 @@ app.use(express.json());
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/category", require("./routes/category"));
 app.use("/api/book", require("./routes/book"));
+app.use("/api/cart", require("./routes/cart"));
+app.use("/api/order", require("./routes/order"));
 
 //start server
 const PORT = process.env.PORT || 3000;

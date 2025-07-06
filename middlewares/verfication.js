@@ -9,7 +9,7 @@ function verifyToken(req, res, next) {
   const token = authHeader.split(" ")[1];
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // Attach user payload
+    req.user = decoded; // Contains userId and isAdmin
     next();
   } catch (error) {
     return res.status(401).json({ message: "Invalid or expired token" });
@@ -18,6 +18,12 @@ function verifyToken(req, res, next) {
 
 function verifyTokenAndAuthorization(req, res, next) {
   verifyToken(req, res, () => {
+    // If no id parameter, just check if user is authenticated
+    if (!req.params.id) {
+      return next();
+    }
+
+    // If there is an id parameter, verify user can access that resource
     if (
       req.user.userId.toString() === req.params.id.toString() ||
       req.user.isAdmin
@@ -29,10 +35,13 @@ function verifyTokenAndAuthorization(req, res, next) {
   });
 }
 
-// Admin-only middleware (reuse verifyToken first)
+// Admin-only middleware
 const isAdmin = (req, res, next) => {
-  if (req.user?.isAdmin) next();
-  else res.status(403).json({ message: "Admin access required" });
+  if (req.user?.isAdmin) {
+    next();
+  } else {
+    res.status(403).json({ message: "Admin access required" });
+  }
 };
 
 module.exports = { verifyToken, verifyTokenAndAuthorization, isAdmin };

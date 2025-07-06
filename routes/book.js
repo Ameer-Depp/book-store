@@ -5,6 +5,7 @@ const {
   getOneBook,
   updateBook,
   deleteBook,
+  rateBook,
 } = require("../controllers/bookController");
 const router = express.Router();
 const { verifyToken, isAdmin } = require("../middlewares/verfication");
@@ -12,6 +13,7 @@ const { verifyToken, isAdmin } = require("../middlewares/verfication");
 // user routes
 router.get("/", getAllBooks);
 router.get("/:id", getOneBook);
+router.delete("/:id", verifyToken, rateBook);
 
 // Admin routes
 router.post("/", verifyToken, isAdmin, createBook);

@@ -49,24 +49,28 @@ const createBook = asyncHandler(async (req, res) => {
     stock: stock,
     category: category,
   });
-  res.status(200).json(newBook);
+  res.status(201).json(newBook);
 });
-
 const updateBook = asyncHandler(async (req, res) => {
-  const id = req.params.id;
-  const check = await Book.findOne({ _id: id });
-  if (!check) {
-    return res.status(404).json({ message: "Book is not found" });
-  }
   const { error, value } = updateBookValidation(req.body);
-  const { title, author, description, price, stock, category } = value;
   if (error) {
     return res.status(400).json({ message: error.details[0].message });
   }
-  const exists = await Book.findOne({ title: title });
+
+  const { title, author, description, price, stock, category } = value;
+  const id = req.params.id;
+
+  // Check if the book to update exists
+  const bookToUpdate = await Book.findById(id);
+  if (!bookToUpdate) {
+    return res.status(404).json({ message: "Book is not found" });
+  }
+
+  const exists = await Book.findOne({ title: title, _id: { $ne: id } });
   if (exists) {
     return res.status(400).json({ message: "book is already exists" });
   }
+
   const updatedBook = await Book.findByIdAndUpdate(
     id,
     {
@@ -82,19 +86,18 @@ const updateBook = asyncHandler(async (req, res) => {
     { new: true }
   );
 
-  res.status(201).json(updatedBook);
+  res.status(200).json(updatedBook);
 });
 
 const deleteBook = asyncHandler(async (req, res) => {
   const id = req.params.id;
 
-  // Check if category exists
   const book = await Book.findById(id);
   if (!book) {
     return res.status(404).json({ message: "book not found" });
   }
   await Book.findByIdAndDelete(id);
-  return res.status(200).json({ message: "Book deleted successfully" });
+  return res.status(204).json({ message: "Book deleted successfully" });
 });
 
 const rateBook = asyncHandler(async (req, res) => {

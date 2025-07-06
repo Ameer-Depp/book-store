@@ -22,7 +22,7 @@ const createCategory = asyncHandler(async (req, res) => {
   const newCategory = await Category.create({
     name: name,
   });
-  res.status(200).json({
+  res.status(201).json({
     message: "category has created!",
     Category: { Category: newCategory.name },
   });
@@ -31,13 +31,12 @@ const createCategory = asyncHandler(async (req, res) => {
 const deleteCategory = asyncHandler(async (req, res) => {
   const id = req.params.id;
 
-  // Check if category exists
   const category = await Category.findById(id);
   if (!category) {
     return res.status(404).json({ message: "Category not found" });
   }
   await Category.findByIdAndDelete(id);
-  return res.status(200).json({ message: "Category deleted successfully" });
+  return res.status(204).json({ message: "Category deleted successfully" });
 });
 
 const updateCategory = asyncHandler(async (req, res) => {
