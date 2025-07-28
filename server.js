@@ -1,28 +1,52 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const { dbConnection } = require("./config/db");
+const morgan = require("morgan");
+const helmet = require("helmet");
+const cors = require("cors");
+const setupSwagger = require("./swagger");
 
-//load configerations
+// Load env variables
 dotenv.config();
 
-//connect to database
+// Connect to database
 dbConnection();
 
-//initiaite the app
+// Initialize app
 const app = express();
 
-//middlewares
+// Middlewares
 app.use(express.json());
+app.use(morgan("dev"));
+app.use(helmet());
+app.use(cors());
+setupSwagger(app);
 
-//end points
+// Health check
+app.get("/", (req, res) => {
+  res.send("API is running...");
+});
+
+// Routes
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/category", require("./routes/category"));
 app.use("/api/book", require("./routes/book"));
 app.use("/api/cart", require("./routes/cart"));
 app.use("/api/order", require("./routes/order"));
 
-//start server
+// 404 Not Found
+app.use((req, res) => {
+  res.status(404).json({ message: "Route not found" });
+});
+
+// Error Handler
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: "Something went wrong!" });
+});
+
+// Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`server is running on PORT: ${PORT}`);
+  console.log(`Server is running on PORT: ${PORT}`);
 });
