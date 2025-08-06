@@ -5,6 +5,7 @@ const morgan = require("morgan");
 const helmet = require("helmet");
 const cors = require("cors");
 const setupSwagger = require("./swagger");
+const cookieParser = require("cookie-parser");
 
 // Load env variables
 dotenv.config();
@@ -17,9 +18,15 @@ const app = express();
 
 // Middlewares
 app.use(express.json());
+app.use(cookieParser());
 app.use(morgan("dev"));
 app.use(helmet());
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
+);
 setupSwagger(app);
 
 // Health check

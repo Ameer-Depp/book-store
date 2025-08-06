@@ -1,15 +1,14 @@
 const jwt = require("jsonwebtoken");
-
 function verifyToken(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) {
+  const token = req.cookies.token; // <-- read token from cookie
+
+  if (!token) {
     return res.status(401).json({ message: "No token provided" });
   }
 
-  const token = authHeader.split(" ")[1];
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // Contains userId and isAdmin
+    req.user = decoded; // { userId, isAdmin }
     next();
   } catch (error) {
     return res.status(401).json({ message: "Invalid or expired token" });
@@ -18,12 +17,10 @@ function verifyToken(req, res, next) {
 
 function verifyTokenAndAuthorization(req, res, next) {
   verifyToken(req, res, () => {
-    // If no id parameter, just check if user is authenticated
     if (!req.params.id) {
       return next();
     }
 
-    // If there is an id parameter, verify user can access that resource
     if (
       req.user.userId.toString() === req.params.id.toString() ||
       req.user.isAdmin
@@ -35,7 +32,6 @@ function verifyTokenAndAuthorization(req, res, next) {
   });
 }
 
-// Admin-only middleware
 const isAdmin = (req, res, next) => {
   if (req.user?.isAdmin) {
     next();
@@ -44,4 +40,8 @@ const isAdmin = (req, res, next) => {
   }
 };
 
-module.exports = { verifyToken, verifyTokenAndAuthorization, isAdmin };
+module.exports = {
+  verifyToken,
+  verifyTokenAndAuthorization,
+  isAdmin,
+};

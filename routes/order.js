@@ -92,6 +92,47 @@ router.post("/", verifyToken, verifyTokenAndAuthorization, createOrder);
  */
 router.get("/", verifyToken, verifyTokenAndAuthorization, getUserOrders);
 
+// =======================
+// 🔐 Admin Order Routes (MOVED BEFORE /:orderId)
+// =======================
+
+/**
+ * @swagger
+ * /api/order/all:
+ *   get:
+ *     summary: Get all orders (Admin only)
+ *     tags: [Order]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of all orders
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: string
+ *                   userId:
+ *                     type: string
+ *                   items:
+ *                     type: array
+ *                   totalAmount:
+ *                     type: number
+ *                   status:
+ *                     type: string
+ *                   createdAt:
+ *                     type: string
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Admin access required
+ */
+router.get("/all", verifyToken, isAdmin, getAllOrders);
+
 /**
  * @swagger
  * /api/order/{orderId}:
@@ -131,47 +172,6 @@ router.get("/", verifyToken, verifyTokenAndAuthorization, getUserOrders);
  *         description: Order not found
  */
 router.get("/:orderId", verifyToken, verifyTokenAndAuthorization, getOrderById);
-
-// =======================
-// 🔐 Admin Order Routes
-// =======================
-
-/**
- * @swagger
- * /api/order/all:
- *   get:
- *     summary: Get all orders (Admin only)
- *     tags: [Order]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of all orders
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: string
- *                   userId:
- *                     type: string
- *                   items:
- *                     type: array
- *                   totalAmount:
- *                     type: number
- *                   status:
- *                     type: string
- *                   createdAt:
- *                     type: string
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Admin access required
- */
-router.get("/all", verifyToken, isAdmin, getAllOrders);
 
 /**
  * @swagger

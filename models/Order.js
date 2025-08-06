@@ -6,6 +6,7 @@ const orderSchema = new mongoose.Schema({
     {
       book: { type: mongoose.Schema.Types.ObjectId, ref: "Book" },
       quantity: Number,
+      price: Number, // Store price at time of purchase
     },
   ],
   totalPrice: Number,
