@@ -7,6 +7,7 @@ const {
   checkAuth,
 } = require("../controllers/authController");
 const { verifyToken } = require("../middlewares/verfication");
+
 const router = express.Router();
 
 router.post("/register", registerUser);

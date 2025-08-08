@@ -6,35 +6,40 @@ const helmet = require("helmet");
 const cors = require("cors");
 const setupSwagger = require("./swagger");
 const cookieParser = require("cookie-parser");
+const rateLimiter = require("./middlewares/rateLimiter");
 
-// Load env variables
 dotenv.config();
 
-// Connect to database
+require("./config/redis");
+
 dbConnection();
 
-// Initialize app
 const app = express();
 
-// Middlewares
-app.use(express.json());
-app.use(cookieParser());
-app.use(morgan("dev"));
+app.set("trust proxy", true);
+
 app.use(helmet());
+
 app.use(
   cors({
     origin: "http://localhost:5173",
     credentials: true,
   })
 );
+
+app.use(express.json());
+app.use(cookieParser());
+
+app.use(morgan("dev"));
+
+app.use(rateLimiter);
+
 setupSwagger(app);
 
-// Health check
 app.get("/", (req, res) => {
   res.send("API is running...");
 });
 
-// Routes
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/category", require("./routes/category"));
 app.use("/api/book", require("./routes/book"));
@@ -42,18 +47,15 @@ app.use("/api/cart", require("./routes/cart"));
 app.use("/api/order", require("./routes/order"));
 app.use("/api/code", require("./routes/code"));
 
-// 404 Not Found
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-// Error Handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: "Something went wrong!" });
 });
 
-// Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on PORT: ${PORT}`);

@@ -4,23 +4,41 @@ const {
   createBookValidation,
   updateBookValidation,
 } = require("../validation/bookValidation");
-
 const { rateBookValidation } = require("../validation/ratingValidation");
+const client = require("../config/redis");
 
 const getAllBooks = asyncHandler(async (req, res) => {
   const { search, category } = req.query;
-  const query = {};
 
-  if (search) {
-    query.title = { $regex: search, $options: "i" }; // case-insensitive
+  const cacheKey = `books:${search || "all"}:${category || "all"}`;
+
+  try {
+    const cachedBooks = await client.get(cacheKey);
+
+    if (cachedBooks) {
+      console.log("serving from cache");
+      return res.status(200).json(JSON.parse(cachedBooks));
+    }
+    const query = {};
+
+    if (search) {
+      query.title = { $regex: search, $options: "i" };
+    }
+
+    if (category) {
+      query.category = category;
+    }
+
+    const books = await Book.find(query).populate("category", "name");
+    await client.setEx(cacheKey, 3600, JSON.stringify(books));
+    console.log("serving from database");
+    res.status(200).json(books);
+    await client.del("books:*");
+  } catch (err) {
+    console.error("Redis error:", err);
+    const books = await Book.find(query).populate("category", "name");
+    res.status(200).json(books);
   }
-
-  if (category) {
-    query.category = category;
-  }
-
-  const books = await Book.find(query).populate("category", "name");
-  res.status(200).json(books);
 });
 
 const getOneBook = asyncHandler(async (req, res) => {
