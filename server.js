@@ -40,6 +40,7 @@ app.use("/api/category", require("./routes/category"));
 app.use("/api/book", require("./routes/book"));
 app.use("/api/cart", require("./routes/cart"));
 app.use("/api/order", require("./routes/order"));
+app.use("/api/code", require("./routes/code"));
 
 // 404 Not Found
 app.use((req, res) => {
