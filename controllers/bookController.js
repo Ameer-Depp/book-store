@@ -7,115 +7,148 @@ const {
 const { rateBookValidation } = require("../validation/ratingValidation");
 const client = require("../config/redis");
 
+const CACHE_VERSION_KEY = "books_cache_version";
+
+async function getCacheVersion() {
+  let version = await client.get(CACHE_VERSION_KEY);
+  if (!version) {
+    version = 1;
+    await client.set(CACHE_VERSION_KEY, version);
+  }
+  return version;
+}
+
+async function bumpCacheVersion() {
+  await client.incr(CACHE_VERSION_KEY);
+}
+
 const getAllBooks = asyncHandler(async (req, res) => {
   const { search, category } = req.query;
-
-  const cacheKey = `books:${search || "all"}:${category || "all"}`;
+  const version = await getCacheVersion();
+  const cacheKey = `books:v${version}:${search || "all"}:${category || "all"}`;
 
   try {
     const cachedBooks = await client.get(cacheKey);
-
     if (cachedBooks) {
-      console.log("serving from cache");
+      console.log("Serving from cache");
       return res.status(200).json(JSON.parse(cachedBooks));
     }
+
     const query = {};
 
     if (search) {
-      query.title = { $regex: search, $options: "i" };
+      query.$text = { $search: search };
     }
 
     if (category) {
       query.category = category;
     }
 
-    const books = await Book.find(query).populate("category", "name");
+    let booksQuery = Book.find(query).populate("category", "name");
+
+    if (search) {
+      booksQuery = booksQuery.sort({ score: { $meta: "textScore" } });
+    } else {
+      booksQuery = booksQuery.sort({ createdAt: -1 });
+    }
+
+    const books = await booksQuery;
+
     await client.setEx(cacheKey, 3600, JSON.stringify(books));
-    console.log("serving from database");
+    console.log("Serving from database with accurate text search!");
     res.status(200).json(books);
-    await client.del("books:*");
   } catch (err) {
-    console.error("Redis error:", err);
-    const books = await Book.find(query).populate("category", "name");
+    console.error("Search error:", err);
+
+    const fallbackQuery = {};
+    if (search) {
+      fallbackQuery.title = { $regex: search, $options: "i" };
+    }
+    if (category) {
+      fallbackQuery.category = category;
+    }
+
+    const books = await Book.find(fallbackQuery).populate("category", "name");
     res.status(200).json(books);
   }
 });
 
 const getOneBook = asyncHandler(async (req, res) => {
-  const book = await Book.findById(req.params.id);
+  const book = await Book.findById(req.params.id).populate("category", "name");
   if (!book) {
-    return res.status(404).json({ message: "book not found" });
+    return res.status(404).json({ message: "Book not found" });
   }
   res.status(200).json(book);
 });
 
 const createBook = asyncHandler(async (req, res) => {
   const { error, value } = createBookValidation(req.body);
-  const { title, author, description, price, stock, category } = value;
   if (error) {
     return res.status(400).json({ message: error.details[0].message });
   }
-  const exists = await Book.findOne({ title: title });
-  if (exists) {
-    return res.status(400).json({ message: "book already exists" });
-  }
-  const newBook = await Book.create({
-    title: title,
-    author: author,
-    description: description,
-    price: price,
-    stock: stock,
-    category: category,
+  const { title, author, description, price, stock, category } = value;
+
+  const exists = await Book.findOne({
+    $text: { $search: `"${title}"` },
   });
+
+  const exactMatch = await Book.findOne({ title });
+
+  if (exists || exactMatch) {
+    return res.status(400).json({ message: "Book already exists" });
+  }
+
+  const newBook = await Book.create({
+    title,
+    author,
+    description,
+    price,
+    stock,
+    category,
+  });
+
+  await bumpCacheVersion();
   res.status(201).json(newBook);
 });
+
 const updateBook = asyncHandler(async (req, res) => {
   const { error, value } = updateBookValidation(req.body);
   if (error) {
     return res.status(400).json({ message: error.details[0].message });
   }
-
   const { title, author, description, price, stock, category } = value;
   const id = req.params.id;
 
-  // Check if the book to update exists
   const bookToUpdate = await Book.findById(id);
   if (!bookToUpdate) {
-    return res.status(404).json({ message: "Book is not found" });
+    return res.status(404).json({ message: "Book not found" });
   }
 
-  const exists = await Book.findOne({ title: title, _id: { $ne: id } });
+  const exists = await Book.findOne({ title, _id: { $ne: id } });
   if (exists) {
-    return res.status(400).json({ message: "book is already exists" });
+    return res.status(400).json({ message: "Book already exists" });
   }
 
   const updatedBook = await Book.findByIdAndUpdate(
     id,
-    {
-      $set: {
-        title: title,
-        author: author,
-        description: description,
-        price: price,
-        stock: stock,
-        category: category,
-      },
-    },
+    { title, author, description, price, stock, category },
     { new: true }
-  );
+  ).populate("category", "name");
 
+  await bumpCacheVersion();
   res.status(200).json(updatedBook);
 });
 
 const deleteBook = asyncHandler(async (req, res) => {
   const id = req.params.id;
-
   const book = await Book.findById(id);
   if (!book) {
-    return res.status(404).json({ message: "book not found" });
+    return res.status(404).json({ message: "Book not found" });
   }
   await Book.findByIdAndDelete(id);
-  return res.status(204).json({ message: "Book deleted successfully" });
+
+  await bumpCacheVersion();
+  res.status(204).json({ message: "Book deleted successfully" });
 });
 
 const rateBook = asyncHandler(async (req, res) => {
@@ -135,13 +168,13 @@ const rateBook = asyncHandler(async (req, res) => {
   );
 
   if (existingRatingIndex !== -1) {
-    book.ratings[existingRatingIndex].rating = value.rating; // update existing
+    book.ratings[existingRatingIndex].rating = value.rating;
   } else {
     book.ratings.push({ userId: req.user.id, rating: value.rating });
   }
 
   await book.save();
-
+  await bumpCacheVersion();
   res.status(200).json({ message: "Rating submitted" });
 });
 

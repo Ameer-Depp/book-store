@@ -9,39 +9,40 @@ const rateLimiter = async (req, res, next) => {
     req.ip ||
     "unknown";
 
-  console.log("Rate limiting for identifier:", identifier);
-
   const routePath = req.path;
-  console.log("Route path:", routePath);
 
   const routeLimits = {
     "/api/auth/login": { window: 60, max: 5 },
     "/api/code/redeem": { window: 3600, max: 3 },
   };
 
-  const { window = 60, max = 10 } = routeLimits[routePath] || {};
+  let window = 60;
+  let max = req.user ? 100 : 10;
 
-  console.log(`Limit for ${routePath}: ${max} requests per ${window}s`);
+  if (routeLimits[routePath]) {
+    window = routeLimits[routePath].window;
+    max = routeLimits[routePath].max;
+  }
 
   try {
     const key = `rate_limit:${routePath}:${identifier}`;
-    console.log("Redis key:", key);
-
     const count = await client.incr(key);
-    console.log("Current count:", count);
 
     if (count === 1) {
       await client.expire(key, window);
     }
 
     const ttl = await client.ttl(key);
-    console.log("TTL:", ttl);
+    if (ttl === -1) {
+      await client.expire(key, window);
+    }
 
     if (count > max) {
-      console.log(`RATE LIMITED! ${count} > ${max}`);
       return res.status(429).json({
-        message: `Too many requests. Limit: ${max}/${window}s. Try again in ${ttl}s.`,
-        retryAfter: ttl,
+        message: `Too many requests. Limit: ${max}/${window}s. Try again in ${
+          ttl > 0 ? ttl : window
+        }s.`,
+        retryAfter: ttl > 0 ? ttl : window,
         current: count,
         limit: max,
       });
@@ -50,7 +51,8 @@ const rateLimiter = async (req, res, next) => {
     res.set({
       "X-RateLimit-Limit": max,
       "X-RateLimit-Remaining": Math.max(0, max - count),
-      "X-RateLimit-Reset": Math.floor(Date.now() / 1000) + ttl,
+      "X-RateLimit-Reset":
+        Math.floor(Date.now() / 1000) + (ttl > 0 ? ttl : window),
     });
 
     next();
