@@ -1,5 +1,6 @@
 const express = require("express");
 const dotenv = require("dotenv");
+const path = require("path");
 const { dbConnection } = require("./config/db");
 const morgan = require("morgan");
 const helmet = require("helmet");
@@ -17,6 +18,8 @@ dbConnection();
 const app = express();
 
 app.set("trust proxy", true);
+
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.use(helmet());
 
